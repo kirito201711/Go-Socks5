@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -12,7 +13,6 @@ import (
 )
 
 const (
-	listenPort                   = "50440"
 	socks5Version                = 0x05
 	authNoAuthenticationRequired = 0x00
 	authNoAcceptableMethods      = 0xff
@@ -26,12 +26,14 @@ const (
 )
 
 func main() {
-	listener, err := net.Listen("tcp", ":"+listenPort)
+	port := flag.String("port", "50440", "The port number for the SOCKS5 proxy to listen on")
+	flag.Parse()
+	listener, err := net.Listen("tcp", ":"+*port)
 	if err != nil {
-		fmt.Printf("Failed to listen: %v\n", err)
+		fmt.Printf("Failed to listen on port %s: %v\n", *port, err)
 		return
 	}
-	fmt.Printf("SOCKS5 proxy server started successfully on port: %s\n", listenPort)
+	fmt.Printf("SOCKS5 proxy server started successfully on port: %s\n", *port)
 	for {
 		clientConn, err := listener.Accept()
 		if err != nil {
