@@ -14,7 +14,7 @@ go version
 
 将 gosocks5.go 文件保存在任意目录中。打开您的终端，进入该目录，然后执行以下命令来编译程序：
 ```bash
-go build -ldflags="-s -w" -trimpath -o gosocks5 gosocks5.go
+CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o gosocks5 gosocks5.go
 ```
 执行成功后，您会在当前目录下看到一个名为 gosocks5 (在 Windows 上是 gosocks5.exe) 的可执行文件。这就是我们的代理服务器程序。
 
