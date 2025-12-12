@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time" // 引入 time 包用于设置 KeepAlive 时间间隔
 )
 
 const (
@@ -42,11 +43,18 @@ func main() {
 		go handleConnection(clientConn)
 	}
 }
+
 func handleConnection(clientConn net.Conn) {
 	defer clientConn.Close()
+
+	// 1. 设置客户端连接的 KeepAlive
+	// 防止客户端异常断电或中间防火墙因连接空闲而切断连接
 	if tcpConn, ok := clientConn.(*net.TCPConn); ok {
-		tcpConn.SetNoDelay(true)
+		tcpConn.SetNoDelay(true)                    // 禁用 Nagle 算法，降低延迟
+		tcpConn.SetKeepAlive(true)                  // 开启保活
+		tcpConn.SetKeepAlivePeriod(3 * time.Minute) // 每 3 分钟探测一次
 	}
+
 	reader := bufio.NewReader(clientConn)
 	if err := handleHandshake(reader, clientConn); err != nil {
 		return
@@ -63,9 +71,15 @@ func handleConnection(clientConn net.Conn) {
 		return
 	}
 	defer targetConn.Close()
+
+	// 2. 设置目标服务器连接的 KeepAlive
+	// 同样为了防止与目标服务器的长连接被中间设备切断
 	if tcpConn, ok := targetConn.(*net.TCPConn); ok {
 		tcpConn.SetNoDelay(true)
+		tcpConn.SetKeepAlive(true)
+		tcpConn.SetKeepAlivePeriod(3 * time.Minute)
 	}
+
 	if err := writeReply(clientConn, repSuccess, targetConn.LocalAddr()); err != nil {
 		return
 	}
@@ -76,6 +90,7 @@ func handleConnection(clientConn net.Conn) {
 	}
 	proxyData(clientConn, targetConn)
 }
+
 func handleHandshake(reader *bufio.Reader, writer io.Writer) error {
 	header := make([]byte, 2)
 	if _, err := io.ReadFull(reader, header); err != nil {
@@ -103,6 +118,7 @@ func handleHandshake(reader *bufio.Reader, writer io.Writer) error {
 	_, err := writer.Write([]byte{socks5Version, authNoAuthenticationRequired})
 	return err
 }
+
 func handleRequest(reader *bufio.Reader) (host string, port int, err error) {
 	reqHeader := make([]byte, 4)
 	if _, err := io.ReadFull(reader, reqHeader); err != nil {
@@ -148,6 +164,7 @@ func handleRequest(reader *bufio.Reader) (host string, port int, err error) {
 	port = int(binary.BigEndian.Uint16(portBytes))
 	return host, port, nil
 }
+
 func writeReply(writer io.Writer, rep byte, addr net.Addr) error {
 	var ip net.IP
 	var port uint16
@@ -177,6 +194,7 @@ func writeReply(writer io.Writer, rep byte, addr net.Addr) error {
 	_, err := writer.Write(res)
 	return err
 }
+
 func proxyData(clientConn net.Conn, targetConn net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
